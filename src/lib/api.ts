@@ -78,3 +78,11 @@ export async function browse9p(path: string): Promise<any> {
   if (ct.includes('text/plain')) return await r.text()
   return await r.json()
 }
+
+export async function renameSession(id: string, newName: string): Promise<void> {
+  await fetch(`/s/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: newName }),
+  })
+}

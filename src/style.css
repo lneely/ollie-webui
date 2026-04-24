@@ -580,7 +580,20 @@ input, select, textarea { font-family: inherit; }
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  list-style: none;
+}
+.tool-header::-webkit-details-marker { display: none; }
+.tool-header::marker { display: none; content: ''; }
+.tool-header::before {
+  content: '▶';
+  font-size: 8px;
+  color: var(--text-faint);
+  transition: transform 0.15s;
+}
+details[open] > .tool-header::before {
+  transform: rotate(90deg);
 }
 .tool-arrow {
   font-size: 1.3em;
@@ -589,6 +602,11 @@ input, select, textarea { font-family: inherit; }
 .tool-name {
   color: var(--tool-text);
   font-weight: 600;
+}
+.tool-detail {
+  color: var(--text-faint);
+  font-size: 11px;
+  font-style: italic;
 }
 .tool-body {
   margin: 0;
@@ -600,6 +618,17 @@ input, select, textarea { font-family: inherit; }
   word-break: break-all;
   color: var(--text);
   overflow-x: auto;
+}
+.tool-output {
+  margin: 0;
+  padding: 6px 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-dim);
+  font-style: italic;
 }
 
 /* ---- Typing indicator ---- */
@@ -850,3 +879,31 @@ input, select, textarea { font-family: inherit; }
 }
 .tree-row-link { cursor: pointer; }
 .tree-row-link:hover .tree-path { text-decoration: underline; }
+
+/* ---- Inline rename ---- */
+.session-rename-input {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--bg-soft);
+  border: 1px solid var(--accent-focus);
+  border-radius: var(--r-sm);
+  padding: 2px 6px;
+  color: var(--text);
+  outline: none;
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- Info messages ---- */
+.message.info { justify-content: flex-start; }
+.message.info .msg-bubble {
+  background: transparent;
+  border: none;
+  padding: 2px 8px;
+}
+.info-text {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-faint);
+}

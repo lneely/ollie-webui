@@ -17,6 +17,7 @@ interface Props {
   browseData: any
   onBrowse: (path: string) => void
   onSelectSession: (id: string) => void
+  onRename: (id: string, newName: string) => void
 }
 
 function stateClass(state: string) {
@@ -25,7 +26,7 @@ function stateClass(state: string) {
   return 'running'
 }
 
-export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, browseData, onBrowse, onSelectSession }: Props) {
+export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, browseData, onBrowse, onSelectSession, onRename }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
   const [atBottom, setAtBottom] = useState(true)
 
@@ -55,15 +56,35 @@ export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, b
     )
   }
 
-  const sid = shortId(session.id)
+  const sid = session.id
   const state = cfg.state ?? 'stopped'
+  const [renaming, setRenaming] = useState(false)
+  const [renameVal, setRenameVal] = useState('')
+
+  const startRename = () => { setRenaming(true); setRenameVal(sid) }
+  const commitRename = () => {
+    setRenaming(false)
+    const name = renameVal.trim()
+    if (name && name !== sid) onRename(sid, name)
+  }
 
   return (
     <main class="main">
       <header class="chat-header">
         <div class="chat-path">
           <span class="fs-path-link" onClick={() => onBrowse('/mnt/s/')}>↑</span>{' '}
-          /s/<span class="path-hi">{sid}</span>/chat
+          /s/{renaming ? (
+            <input
+              class="session-rename-input"
+              value={renameVal}
+              onInput={e => setRenameVal((e.target as HTMLInputElement).value)}
+              onBlur={() => commitRename()}
+              onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenaming(false) }}
+              autoFocus
+            />
+          ) : (
+            <span class="path-hi" onDblClick={startRename}>{sid}</span>
+          )}/chat
         </div>
         <div class="header-meta">
           <div class={`state-dot ${stateClass(state)}`} style="margin-right: 2px;" />
@@ -87,6 +108,8 @@ export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, b
                 <div class="user-text"><span class="msg-prefix">u: </span>{msg.content}</div>
               ) : msg.role === 'tool' ? (
                 <ToolCall content={msg.content} />
+              ) : msg.role === 'info' ? (
+                <div class="info-text">{msg.content}</div>
               ) : (
                 <div
                   class="md"
@@ -111,31 +134,37 @@ export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, b
   )
 }
 
-function formatToolContent(raw: string): { name: string; body: string } {
-  const m = raw.match(/^(\w+)\(([\s\S]*)\)\s*$/)
-  if (!m) return { name: '', body: raw }
+function formatToolContent(raw: string): { name: string; detail: string; body: string; output: string } {
+  const m = raw.match(/^(\w+)\((\{[\s\S]*\})\)(.*)$/s)
+  if (!m) return { name: '', detail: '', body: raw, output: '' }
+  const name = m[1]
+  const output = m[3].trim()
   try {
     const obj = JSON.parse(m[2])
-    // For execute_code, extract just the code/tool from steps
-    if (m[1] === 'execute_code' && obj.steps) {
-      const lines = obj.steps.map((s: any) => s.code ?? s.tool ?? JSON.stringify(s)).join('\n')
-      return { name: m[1], body: lines }
-    }
-    return { name: m[1], body: JSON.stringify(obj, null, 2) }
+    // Extract a useful detail: tool name or language
+    let detail = ''
+    if (obj.steps?.[0]?.tool) detail = obj.steps[0].tool
+    else if (obj.steps?.[0]?.code) detail = obj.language ?? 'bash'
+    return { name, detail, body: JSON.stringify(obj, null, 2), output }
   } catch {
-    return { name: m[1], body: m[2] }
+    return { name, detail: '', body: m[2], output }
   }
 }
 
 function ToolCall({ content }: { content: string }) {
-  const { name, body } = formatToolContent(content)
+  const { name, detail, body, output } = formatToolContent(content)
+  const [open, setOpen] = useState(false)
   return (
     <div class="tool-call">
-      <div class="tool-header">
-        <span class="tool-arrow">🖥️</span>
-        {name && <span class="tool-name">{name}</span>}
-      </div>
-      <pre class="tool-body">{body}</pre>
+      <details open={open} onToggle={(e: Event) => setOpen((e.target as HTMLDetailsElement).open)}>
+        <summary class="tool-header">
+          <span class="tool-arrow">🖥️</span>
+          {name && <span class="tool-name">{name}</span>}
+          {detail && <span class="tool-detail">{detail}</span>}
+        </summary>
+        <pre class="tool-body">{body}</pre>
+      </details>
+      {output && <pre class="tool-output">{output}</pre>}
     </div>
   )
 }

@@ -1,5 +1,5 @@
 export interface ChatMessage {
-  role: 'user' | 'assistant' | 'tool'
+  role: 'user' | 'assistant' | 'tool' | 'info'
   content: string
 }
 
@@ -20,6 +20,9 @@ export function parseChat(lines: string[]): ChatMessage[] {
     } else if (line.startsWith('-> ')) {
       if (cur) messages.push(cur)
       cur = { role: 'tool', content: line.slice(3) }
+    } else if (line.startsWith(':: ')) {
+      if (cur) messages.push(cur)
+      cur = { role: 'info', content: line.slice(3) }
     } else if (cur) {
       cur.content += '\n' + line
     }

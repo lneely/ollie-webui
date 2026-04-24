@@ -1,6 +1,7 @@
+import { useState } from 'preact/hooks'
 import type { IdxEntry } from '../lib/api'
 import type { Theme } from '../lib/theme'
-import { shortId, truncate } from '../lib/chat'
+import { truncate } from '../lib/chat'
 
 interface Props {
   sessions: IdxEntry[]
@@ -8,6 +9,7 @@ interface Props {
   onSelect: (id: string | null) => void
   onNew: () => void
   onKill: (id: string) => void
+  onRename: (id: string, newName: string) => void
   themes: Theme[]
   currentTheme: string
   onThemeChange: (name: string) => void
@@ -19,7 +21,21 @@ function stateClass(state: string) {
   return 'running' // thinking, calling: <tool>, etc.
 }
 
-export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill, themes, currentTheme, onThemeChange }: Props) {
+export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill, onRename, themes, currentTheme, onThemeChange }: Props) {
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+
+  const startRename = (e: MouseEvent, id: string) => {
+    e.stopPropagation()
+    setEditingId(id)
+    setEditValue(id)
+  }
+
+  const commitRename = (oldId: string) => {
+    const name = editValue.trim()
+    setEditingId(null)
+    if (name && name !== oldId) onRename(oldId, name)
+  }
   return (
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -49,7 +65,19 @@ export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill, themes,
           >
             <div class="session-card-row">
               <div class={`state-dot ${stateClass(s.state)}`} />
-              <div class="session-id-label">{shortId(s.id)}</div>
+              {editingId === s.id ? (
+                <input
+                  class="session-rename-input"
+                  value={editValue}
+                  onInput={e => setEditValue((e.target as HTMLInputElement).value)}
+                  onBlur={() => commitRename(s.id)}
+                  onKeyDown={e => { if (e.key === 'Enter') commitRename(s.id); if (e.key === 'Escape') setEditingId(null) }}
+                  onClick={e => e.stopPropagation()}
+                  autoFocus
+                />
+              ) : (
+                <div class="session-id-label" onDblClick={(e: MouseEvent) => startRename(e, s.id)}>{s.id}</div>
+              )}
               <div class="session-state-label">{s.state}</div>
               <button
                 class="btn-kill"

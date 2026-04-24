@@ -12,6 +12,7 @@ import {
   createSession,
   killSession,
   browse9p,
+  renameSession,
 } from './lib/api'
 import type { IdxEntry } from './lib/api'
 import { parseChat } from './lib/chat'
@@ -122,6 +123,13 @@ export function App() {
     setSessions(s)
   }, [selectedId])
 
+  const handleRename = useCallback(async (id: string, newName: string) => {
+    await renameSession(id, newName)
+    if (selectedId === id) setSelectedId(newName)
+    const s = await listSessions()
+    setSessions(s)
+  }, [selectedId])
+
   return (
     <div class="layout">
       <Sidebar
@@ -130,6 +138,7 @@ export function App() {
         onSelect={handleSelect}
         onNew={() => setShowNew(true)}
         onKill={handleKill}
+        onRename={handleRename}
         themes={getThemes()}
         currentTheme={themeName}
         onThemeChange={handleSetTheme}
@@ -144,6 +153,7 @@ export function App() {
         browseData={browseData}
         onBrowse={handleBrowse}
         onSelectSession={handleSelect}
+        onRename={handleRename}
       />
       {showNew && (
         <NewSession onClose={() => setShowNew(false)} onCreate={handleCreate} />
