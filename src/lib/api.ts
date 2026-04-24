@@ -70,3 +70,11 @@ export async function getBackends(): Promise<string[]> {
 export async function killSession(id: string): Promise<void> {
   await fetch(`/s/${id}`, { method: 'DELETE' })
 }
+
+export async function browse9p(path: string): Promise<any> {
+  const r = await fetch(path)
+  if (!r.ok) return null
+  const ct = r.headers.get('content-type') ?? ''
+  if (ct.includes('text/plain')) return await r.text()
+  return await r.json()
+}

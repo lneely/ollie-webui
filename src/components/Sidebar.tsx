@@ -1,12 +1,16 @@
 import type { IdxEntry } from '../lib/api'
+import type { Theme } from '../lib/theme'
 import { shortId, truncate } from '../lib/chat'
 
 interface Props {
   sessions: IdxEntry[]
   selectedId: string | null
-  onSelect: (id: string) => void
+  onSelect: (id: string | null) => void
   onNew: () => void
   onKill: (id: string) => void
+  themes: Theme[]
+  currentTheme: string
+  onThemeChange: (name: string) => void
 }
 
 function stateClass(state: string) {
@@ -15,7 +19,7 @@ function stateClass(state: string) {
   return 'running' // thinking, calling: <tool>, etc.
 }
 
-export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill }: Props) {
+export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill, themes, currentTheme, onThemeChange }: Props) {
   return (
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -41,7 +45,7 @@ export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill }: Props
           <div
             key={s.id}
             class={`session-card${s.id === selectedId ? ' selected' : ''}`}
-            onClick={() => onSelect(s.id)}
+            onClick={() => onSelect(s.id === selectedId ? null : s.id)}
           >
             <div class="session-card-row">
               <div class={`state-dot ${stateClass(s.state)}`} />
@@ -61,6 +65,18 @@ export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill }: Props
           </div>
         ))}
       </div>
+
+      {themes.length > 1 && (
+        <div class="sidebar-footer">
+          <select
+            class="theme-select"
+            value={currentTheme}
+            onChange={e => onThemeChange((e.target as HTMLSelectElement).value)}
+          >
+            {themes.map(t => <option key={t.name} value={t.name}>{t.label}</option>)}
+          </select>
+        </div>
+      )}
     </aside>
   )
 }

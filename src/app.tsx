@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks'
 import { Sidebar } from './components/Sidebar'
 import { ChatPane } from './components/ChatPane'
 import { NewSession } from './components/NewSession'
+import { getTheme, getThemes, loadThemeName, saveThemeName, applyTheme } from './lib/theme'
 import {
   listSessions,
   getSessionCfg,
@@ -10,6 +11,7 @@ import {
   sendCtl,
   createSession,
   killSession,
+  browse9p,
 } from './lib/api'
 import type { IdxEntry } from './lib/api'
 import { parseChat } from './lib/chat'
@@ -21,6 +23,42 @@ export function App() {
   const [cfg, setCfg]             = useState<Record<string, string> | null>(null)
   const [messages, setMessages]   = useState<ChatMessage[]>([])
   const [showNew, setShowNew]     = useState(false)
+  const [themeName, setThemeName] = useState(loadThemeName)
+  const [browsePath, setBrowsePath] = useState<string | null>(null)
+  const [browseData, setBrowseData] = useState<any>(null)
+
+  // Apply theme on mount and when changed.
+  useEffect(() => { applyTheme(getTheme(themeName)) }, [themeName])
+
+  const handleSetTheme = useCallback((name: string) => {
+    saveThemeName(name)
+    setThemeName(name)
+  }, [])
+
+  const handleBrowse = useCallback(async (path: string) => {
+    setSelectedId(null)
+    setBrowsePath(path)
+    if (path === '/mnt/') {
+      // Synthetic root listing
+      setBrowseData([
+        { name: 's', is_dir: true },
+        { name: 'a', is_dir: true },
+        { name: 'm', is_dir: true },
+        { name: 't', is_dir: true },
+        { name: 'sk', is_dir: true },
+      ])
+    } else {
+      const apiPath = path.startsWith('/mnt/') ? '/' + path.slice(5) : path
+      const data = await browse9p(apiPath)
+      setBrowseData(data)
+    }
+  }, [])
+
+  const handleSelect = useCallback((id: string | null) => {
+    setSelectedId(id)
+    setBrowsePath(null)
+    setBrowseData(null)
+  }, [])
 
   // Session list — poll every 5s.
   useEffect(() => {
@@ -89,9 +127,12 @@ export function App() {
       <Sidebar
         sessions={sessions}
         selectedId={selectedId}
-        onSelect={setSelectedId}
+        onSelect={handleSelect}
         onNew={() => setShowNew(true)}
         onKill={handleKill}
+        themes={getThemes()}
+        currentTheme={themeName}
+        onThemeChange={handleSetTheme}
       />
       <ChatPane
         session={sessions.find(s => s.id === selectedId) ?? null}
@@ -99,6 +140,10 @@ export function App() {
         messages={messages}
         onSend={handleSend}
         onStop={handleStop}
+        browsePath={browsePath}
+        browseData={browseData}
+        onBrowse={handleBrowse}
+        onSelectSession={handleSelect}
       />
       {showNew && (
         <NewSession onClose={() => setShowNew(false)} onCreate={handleCreate} />
