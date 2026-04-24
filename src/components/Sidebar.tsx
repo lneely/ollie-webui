@@ -6,15 +6,16 @@ interface Props {
   selectedId: string | null
   onSelect: (id: string) => void
   onNew: () => void
+  onKill: (id: string) => void
 }
 
 function stateClass(state: string) {
-  if (state === 'running') return 'running'
-  if (state === 'idle' || state === 'waiting') return 'idle'
-  return 'stopped'
+  if (state === 'idle') return 'idle'
+  if (state === 'stopped') return 'stopped'
+  return 'running' // thinking, calling: <tool>, etc.
 }
 
-export function Sidebar({ sessions, selectedId, onSelect, onNew }: Props) {
+export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill }: Props) {
   return (
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -46,6 +47,11 @@ export function Sidebar({ sessions, selectedId, onSelect, onNew }: Props) {
               <div class={`state-dot ${stateClass(s.state)}`} />
               <div class="session-id-label">{shortId(s.id)}</div>
               <div class="session-state-label">{s.state}</div>
+              <button
+                class="btn-kill"
+                title="Kill session"
+                onClick={(e: MouseEvent) => { e.stopPropagation(); onKill(s.id) }}
+              >✕</button>
             </div>
             <div class="session-cwd" title={s.cwd}>{s.cwd}</div>
             <div class="session-badges">

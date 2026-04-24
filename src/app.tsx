@@ -9,6 +9,7 @@ import {
   sendPrompt,
   sendCtl,
   createSession,
+  killSession,
 } from './lib/api'
 import type { IdxEntry } from './lib/api'
 import { parseChat } from './lib/chat'
@@ -76,6 +77,13 @@ export function App() {
     if (s.length > 0) setSelectedId(s[s.length - 1].id)
   }, [])
 
+  const handleKill = useCallback(async (id: string) => {
+    await killSession(id)
+    if (selectedId === id) setSelectedId(null)
+    const s = await listSessions()
+    setSessions(s)
+  }, [selectedId])
+
   return (
     <div class="layout">
       <Sidebar
@@ -83,6 +91,7 @@ export function App() {
         selectedId={selectedId}
         onSelect={setSelectedId}
         onNew={() => setShowNew(true)}
+        onKill={handleKill}
       />
       <ChatPane
         session={sessions.find(s => s.id === selectedId) ?? null}

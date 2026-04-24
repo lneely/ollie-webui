@@ -16,16 +16,16 @@ interface Props {
 }
 
 function stateClass(state: string) {
-  if (state === 'running') return 'running'
-  if (state === 'idle' || state === 'waiting') return 'idle'
-  return 'stopped'
+  if (state === 'idle') return 'idle'
+  if (state === 'stopped') return 'stopped'
+  return 'running'
 }
 
 export function ChatPane({ session, cfg, messages, onSend, onStop }: Props) {
   const listRef = useRef<HTMLDivElement>(null)
   const [atBottom, setAtBottom] = useState(true)
 
-  const isRunning = cfg?.state === 'running'
+  const isRunning = !!cfg?.state && cfg.state !== 'idle' && cfg.state !== 'stopped'
 
   useEffect(() => {
     if (atBottom && listRef.current) {
@@ -76,6 +76,8 @@ export function ChatPane({ session, cfg, messages, onSend, onStop }: Props) {
             <div class="msg-bubble">
               {msg.role === 'user' ? (
                 <div class="user-text">{msg.content}</div>
+              ) : msg.role === 'tool' ? (
+                <ToolCall content={msg.content} />
               ) : (
                 <div
                   class="md"
@@ -97,6 +99,28 @@ export function ChatPane({ session, cfg, messages, onSend, onStop }: Props) {
 
       <PromptBar running={isRunning} onSend={onSend} onStop={onStop} />
     </main>
+  )
+}
+
+function formatToolContent(raw: string): { name: string; body: string } {
+  const m = raw.match(/^(\w+)\(([\s\S]*)\)\s*$/)
+  if (!m) return { name: '', body: raw }
+  try {
+    const obj = JSON.parse(m[2])
+    return { name: m[1], body: JSON.stringify(obj, null, 2) }
+  } catch {
+    return { name: m[1], body: m[2] }
+  }
+}
+
+function ToolCall({ content }: { content: string }) {
+  const { name, body } = formatToolContent(content)
+  return (
+    <div class="tool-call">
+      <span class="tool-arrow">→</span>{' '}
+      {name && <span class="tool-name">{name}</span>}
+      <pre class="tool-body">{body}</pre>
+    </div>
   )
 }
 

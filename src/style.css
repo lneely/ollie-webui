@@ -202,6 +202,20 @@ input, select, textarea { font-family: inherit; }
   flex-wrap: wrap;
 }
 
+.btn-kill {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  padding: 0 4px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.btn-kill:hover { color: var(--danger); }
+.session-card:hover .btn-kill { display: block; }
+
 /* ---- Badges ---- */
 .badge {
   font-family: var(--mono);
@@ -261,11 +275,12 @@ input, select, textarea { font-family: inherit; }
 .btn-primary:hover:not(:disabled) { background: #35ddf5; }
 
 .btn-danger {
-  background: transparent;
+  background: rgba(251, 113, 133, 0.12);
   border-color: rgba(251, 113, 133, 0.35);
   color: var(--danger);
+  font-weight: 600;
 }
-.btn-danger:hover:not(:disabled) { background: rgba(251, 113, 133, 0.07); }
+.btn-danger:hover:not(:disabled) { background: rgba(251, 113, 133, 0.2); }
 
 /* ---- Main area ---- */
 .main {
@@ -503,6 +518,44 @@ input, select, textarea { font-family: inherit; }
   text-align: left;
 }
 .md th { background: var(--bg-soft); font-weight: 600; }
+
+/* ---- Tool calls ---- */
+.message.tool { justify-content: flex-start; }
+.message.tool .msg-bubble {
+  max-width: 100%;
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--r-sm);
+  padding: 6px 12px;
+}
+.tool-call {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.tool-arrow {
+  color: var(--warning);
+  font-weight: 600;
+}
+.tool-name {
+  color: var(--accent);
+  font-weight: 500;
+}
+.tool-body {
+  margin: 6px 0 0;
+  padding: 8px 12px;
+  background: #07070f;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 11.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--text-dim);
+  overflow-x: auto;
+}
 
 /* ---- Typing indicator ---- */
 .typing {

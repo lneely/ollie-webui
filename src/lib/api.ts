@@ -22,17 +22,13 @@ export async function getSessionCfg(id: string): Promise<Record<string, string>>
     : {}
 }
 
-// The gateway strips empty lines, returning string[] or {"chat":"single line"}.
+// The gateway returns chat as plain text (one line per key=value pair).
 export async function getChatLines(id: string): Promise<string[]> {
   const r = await fetch(`/s/${id}/chat`)
   if (!r.ok) return []
-  const data = await r.json()
-  if (Array.isArray(data)) return data as string[]
-  if (data && typeof data === 'object') {
-    const v = Object.values(data as Record<string, unknown>)[0]
-    return typeof v === 'string' && v ? [v] : []
-  }
-  return []
+  const text = await r.text()
+  if (!text.trim()) return []
+  return text.trimEnd().split('\n')
 }
 
 export async function sendPrompt(id: string, prompt: string): Promise<void> {
@@ -69,4 +65,8 @@ export async function getBackends(): Promise<string[]> {
   if (!r.ok) return []
   const data = await r.json()
   return Array.isArray(data) ? (data as string[]) : []
+}
+
+export async function killSession(id: string): Promise<void> {
+  await fetch(`/s/${id}`, { method: 'DELETE' })
 }

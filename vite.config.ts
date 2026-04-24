@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [preact()],
   server: {
     proxy: {
-      '/s': 'http://localhost:8080',
+      '/s/': 'http://localhost:8080',
       '/backends': 'http://localhost:8080',
       '/openapi.json': 'http://localhost:8080',
     },
