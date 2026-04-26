@@ -1,11 +1,87 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import { marked } from 'marked'
+
+import mermaid from 'mermaid'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
+import plantumlEncoder from 'plantuml-encoder'
 import type { IdxEntry } from '../lib/api'
+import { write9p, browse9p } from '../lib/api'
 import type { ChatMessage } from '../lib/chat'
 import { shortId, truncate } from '../lib/chat'
 import { PromptBar } from './PromptBar'
 
-marked.use({ gfm: true, breaks: false })
+mermaid.initialize({ startOnLoad: false, theme: 'dark' })
+
+function diagramWrap(label: string, rendered: string, source: string): string {
+  return `<div class="diagram-wrap">` +
+    `<button class="diagram-toggle" type="button" data-label="${label}">${label}</button>` +
+    rendered +
+    `<pre class="diagram-source">${escapeHtml(source)}</pre>` +
+    `</div>`
+}
+
+const renderer = {
+  code(code: string, lang: string | undefined): string {
+    const l = (lang ?? '').toLowerCase()
+    if (l === 'mermaid') {
+      return diagramWrap('mermaid', `<div class="diagram-mermaid">${escapeHtml(code)}</div>`, code)
+    }
+    if (l === 'math' || l === 'latex' || l === 'tex') {
+      let rendered: string
+      try {
+        rendered = `<div class="diagram-math">${katex.renderToString(code, { displayMode: true, throwOnError: false })}</div>`
+      } catch {
+        rendered = `<pre class="diagram-error">${escapeHtml(code)}</pre>`
+      }
+      return diagramWrap('math', rendered, code)
+    }
+    if (l === 'plantuml') {
+      const encoded = plantumlEncoder.encode(code)
+      return diagramWrap('plantuml',
+        `<div class="diagram-plantuml"><img src="https://www.plantuml.com/plantuml/svg/${encoded}" alt="PlantUML diagram" loading="lazy" /></div>`,
+        code)
+    }
+    return `<pre><code class="language-${escapeHtml(lang ?? '')}">${escapeHtml(code)}</code></pre>`
+  },
+}
+
+function escapeHtml(s: string) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+marked.use({ gfm: true, breaks: false, renderer })
+
+// Display math: $$...$$ as a block or inline paragraph
+marked.use({
+  extensions: [
+    {
+      name: 'displayMath',
+      level: 'block',
+      start(src: string) { return src.indexOf('$$') },
+      tokenizer(src: string) {
+        const m = src.match(/^\$\$([\s\S]+?)\$\$/)
+        if (m) return { type: 'displayMath', raw: m[0], text: m[1].trim() }
+      },
+      renderer(token: any) {
+        const rendered = `<div class="diagram-math">${katex.renderToString(token.text, { displayMode: true, throwOnError: false })}</div>`
+        return diagramWrap('math', rendered, token.text)
+      },
+    },
+    {
+      name: 'inlineMath',
+      level: 'inline',
+      start(src: string) { return src.indexOf('$') },
+      tokenizer(src: string) {
+        const m = src.match(/^\$([^$\n]+?)\$/)
+        if (m) return { type: 'inlineMath', raw: m[0], text: m[1] }
+      },
+      renderer(token: any) {
+        return katex.renderToString(token.text, { displayMode: false, throwOnError: false })
+      },
+    },
+  ],
+})
 
 interface Props {
   session: IdxEntry | null
@@ -38,10 +114,43 @@ export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, b
     }
   }, [messages.length, isRunning, atBottom])
 
+  useEffect(() => {
+    if (!listRef.current) return
+    const nodes = Array.from(listRef.current.querySelectorAll<HTMLElement>('.diagram-mermaid:not([data-processed])'))
+    if (nodes.length === 0) return
+    mermaid.run({ nodes }).catch(() => {})
+  }, [messages.length])
+
   const handleScroll = () => {
     const el = listRef.current
     if (!el) return
     setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 80)
+  }
+
+  const [modalHtml, setModalHtml] = useState<string | null>(null)
+
+  const handleDiagramClick = (e: MouseEvent) => {
+    const target = e.target as HTMLElement
+
+    // Toggle button: switch between rendered and source
+    const btn = target.closest('.diagram-toggle') as HTMLElement | null
+    if (btn) {
+      const wrap = btn.closest('.diagram-wrap') as HTMLElement | null
+      if (!wrap) return
+      const isSource = wrap.classList.toggle('show-source')
+      btn.textContent = isSource ? 'render' : btn.dataset.label ?? ''
+      if (!isSource) {
+        const node = wrap.querySelector<HTMLElement>('.diagram-mermaid:not([data-processed])')
+        if (node) mermaid.run({ nodes: [node] }).catch(() => {})
+      }
+      return
+    }
+
+    // Click on rendered diagram content → open zoom modal
+    const wrap = target.closest('.diagram-wrap') as HTMLElement | null
+    if (!wrap || wrap.classList.contains('show-source')) return
+    const rendered = wrap.querySelector<HTMLElement>('.diagram-mermaid, .diagram-plantuml, .diagram-math')
+    if (rendered) setModalHtml(rendered.outerHTML)
   }
 
   if (!session || !cfg) {
@@ -96,7 +205,9 @@ export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, b
         </div>
       </header>
 
-      <div class="message-list" ref={listRef} onScroll={handleScroll}>
+      {modalHtml && <DiagramModal html={modalHtml} onClose={() => setModalHtml(null)} />}
+
+      <div class="message-list" ref={listRef} onScroll={handleScroll} onClick={handleDiagramClick as any}>
         {messages.length === 0 && !isRunning && (
           <div class="message-empty">/s/{sid}/chat</div>
         )}
@@ -131,6 +242,84 @@ export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, b
 
       <PromptBar running={isRunning} onSend={onSend} onStop={onStop} />
     </main>
+  )
+}
+
+function DiagramModal({ html, onClose }: { html: string; onClose: () => void }) {
+  // Transform state kept in a ref so wheel handler never captures stale values
+  const xf = useRef({ scale: 1, ox: 0, oy: 0 })
+  const [, rerender] = useState(0)
+  const bump = () => rerender(n => n + 1)
+
+  const dragging = useRef(false)
+  const dragStart = useRef({ mx: 0, my: 0, ox: 0, oy: 0 })
+  const canvasRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose])
+
+  // Non-passive wheel for zoom-to-cursor
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+    const handler = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = el.getBoundingClientRect()
+      // cursor position relative to canvas center (where content is naturally anchored)
+      const dx = (e.clientX - rect.left) - rect.width / 2
+      const dy = (e.clientY - rect.top) - rect.height / 2
+      const { scale: s, ox, oy } = xf.current
+      const ns = Math.max(0.05, Math.min(20, s * (e.deltaY < 0 ? 1.15 : 1 / 1.15)))
+      const r = ns / s
+      xf.current = { scale: ns, ox: dx - (dx - ox) * r, oy: dy - (dy - oy) * r }
+      bump()
+    }
+    el.addEventListener('wheel', handler, { passive: false })
+    return () => el.removeEventListener('wheel', handler)
+  }, [])
+
+  const onMouseDown = (e: MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) return
+    dragging.current = true
+    dragStart.current = { mx: e.clientX, my: e.clientY, ox: xf.current.ox, oy: xf.current.oy }
+    e.preventDefault()
+  }
+  const onMouseMove = (e: MouseEvent) => {
+    if (!dragging.current) return
+    xf.current = { ...xf.current, ox: dragStart.current.ox + e.clientX - dragStart.current.mx, oy: dragStart.current.oy + e.clientY - dragStart.current.my }
+    bump()
+  }
+  const onMouseUp = () => { dragging.current = false }
+
+  const { scale, ox, oy } = xf.current
+
+  return (
+    <div class="diagram-modal-overlay" onClick={onClose}>
+      <div class="diagram-modal-toolbar" onClick={e => e.stopPropagation()}>
+        <button class="dmt-btn" onClick={() => { xf.current = { ...xf.current, scale: Math.min(20, xf.current.scale * 1.25) }; bump() }}>+</button>
+        <button class="dmt-btn" onClick={() => { xf.current = { scale: 1, ox: 0, oy: 0 }; bump() }}>reset</button>
+        <button class="dmt-btn" onClick={() => { xf.current = { ...xf.current, scale: Math.max(0.05, xf.current.scale / 1.25) }; bump() }}>−</button>
+        <button class="dmt-btn dmt-close" onClick={onClose}>✕</button>
+      </div>
+      <div
+        class="diagram-modal-canvas"
+        ref={canvasRef}
+        onMouseDown={onMouseDown as any}
+        onMouseMove={onMouseMove as any}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
+        onClick={e => e.stopPropagation()}
+      >
+        <div
+          class="diagram-modal-content"
+          style={{ transform: `translate(${ox}px, ${oy}px) scale(${scale})` }}
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      </div>
+    </div>
   )
 }
 
@@ -201,21 +390,50 @@ function FsBrowser({ path, data, onNavigate, onSelectSession }: { path: string; 
   const parent = path === '/mnt/' ? null : path.replace(/[^/]+\/?$/, '') || '/mnt/'
   const displayPath = path.startsWith('/mnt') ? path.slice(4) : path
   const isSessionDir = path === '/mnt/s/'
+  const isDir = Array.isArray(data) && data.length > 0 && typeof data[0] === 'object'
+  const apiPath = path.startsWith('/mnt/') ? '/' + path.slice(5) : path
 
-  // For /s/, filter to directories only and clicking selects the session
+  const fileContent = data === null || isDir ? null
+    : Array.isArray(data) ? data.join('\n')
+    : typeof data === 'object' ? Object.entries(data).map(([k, v]) => `${k}=${v}`).join('\n')
+    : String(data)
+
+  const [draft, setDraft] = useState(fileContent ?? '')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { if (fileContent !== null) setDraft(fileContent) }, [fileContent])
+
   const filteredData = isSessionDir && Array.isArray(data)
     ? data.filter((e: any) => e.is_dir)
     : data
+
+  const handleSave = async () => {
+    setSaving(true)
+    await write9p(apiPath, draft)
+    setSaving(false)
+  }
+
+  const handleReload = async () => {
+    const fresh = await browse9p(apiPath)
+    const text = fresh === null ? ''
+      : Array.isArray(fresh) ? fresh.join('\n')
+      : typeof fresh === 'object' ? Object.entries(fresh).map(([k, v]) => `${k}=${v}`).join('\n')
+      : String(fresh)
+    setDraft(text)
+  }
+
   return (
     <div class="fs-browser">
       <div class="fs-path">
-        {parent && <span class="fs-path-link" onClick={() => onNavigate(parent)}>↑</span>}
+        {parent && <span class="fs-path-link" onClick={() => onNavigate(parent)}>..</span>}
         {parent && ' '}{displayPath}
+        {fileContent !== null && <span class="fs-path-link" onClick={handleSave}>{saving ? '…' : 'Put'}</span>}
+        {fileContent !== null && <span class="fs-path-link" onClick={handleReload}>Get</span>}
       </div>
       <div class="fs-content">
         {filteredData === null ? (
           <div class="fs-empty">loading…</div>
-        ) : Array.isArray(filteredData) && filteredData.length > 0 && typeof filteredData[0] === 'object' ? (
+        ) : isDir ? (
           filteredData.map((entry: any) => (
             <div
               key={entry.name}
@@ -228,12 +446,8 @@ function FsBrowser({ path, data, onNavigate, onSelectSession }: { path: string; 
               {entry.size > 0 && <span class="fs-entry-size">{entry.size}</span>}
             </div>
           ))
-        ) : Array.isArray(filteredData) ? (
-          <pre class="fs-file">{filteredData.join('\n')}</pre>
-        ) : typeof filteredData === 'object' ? (
-          <pre class="fs-file">{Object.entries(filteredData).map(([k, v]) => `${k}=${v}`).join('\n')}</pre>
         ) : (
-          <pre class="fs-file">{String(filteredData)}</pre>
+          <textarea class="fs-editor" value={draft} onInput={(e) => setDraft((e.target as HTMLTextAreaElement).value)} />
         )}
       </div>
     </div>

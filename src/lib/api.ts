@@ -79,6 +79,11 @@ export async function browse9p(path: string): Promise<any> {
   return await r.json()
 }
 
+export async function write9p(path: string, content: string): Promise<boolean> {
+  const r = await fetch(path, { method: 'PUT', body: content })
+  return r.ok
+}
+
 export async function renameSession(id: string, newName: string): Promise<void> {
   await fetch(`/s/${id}`, {
     method: 'PATCH',
