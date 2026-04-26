@@ -1,4 +1,4 @@
-import { useState, useRef } from 'preact/hooks'
+import { useState, useRef, useEffect } from 'preact/hooks'
 
 interface Props {
   running: boolean
@@ -9,6 +9,8 @@ interface Props {
 export function PromptBar({ running, onSend, onStop }: Props) {
   const [value, setValue] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
+
+  useEffect(() => { ref.current?.focus() })
 
   const submit = () => {
     const text = value.trim()
