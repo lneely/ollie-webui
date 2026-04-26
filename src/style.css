@@ -878,6 +878,12 @@ details[open] > .tool-header::before {
   word-break: break-all;
   color: var(--text);
 }
+.file-link {
+  cursor: pointer;
+  text-decoration: underline;
+  color: var(--accent);
+}
+.file-link:hover { opacity: 0.8; }
 .fs-editor {
   width: 100%;
   height: 100%;

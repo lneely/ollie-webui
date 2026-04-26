@@ -11,6 +11,7 @@ export default defineConfig({
       '/t/': 'http://localhost:8080',
       '/sk/': 'http://localhost:8080',
       '/backends': 'http://localhost:8080',
+      '/open': 'http://localhost:8080',
       '/openapi.json': 'http://localhost:8080',
     },
   },

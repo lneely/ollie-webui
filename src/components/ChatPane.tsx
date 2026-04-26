@@ -50,6 +50,19 @@ function escapeHtml(s: string) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+function linkifyPaths(html: string, cwd: string): string {
+  return html.replace(/<code>([^<]+)<\/code>/g, (_match, inner: string) => {
+    // Match: has a file extension, or contains a /
+    if (!/\.\w+/.test(inner) && !inner.includes('/')) return _match
+    // Exclude things that are clearly not paths (spaces, parens, etc.)
+    if (/[\s(){}[\]|;]/.test(inner)) return _match
+    const filePart = inner.split(':')[0]
+    const href = filePart.startsWith('/') ? `file://${filePart}` : `file://${cwd}/${filePart}`
+    const fullPath = filePart.startsWith('/') ? filePart : cwd + '/' + filePart
+    return `<code><a class="file-link" href="#" data-fpath="${escapeHtml(fullPath)}">${inner}</a></code>`
+  })
+}
+
 marked.use({ gfm: true, breaks: false, renderer })
 
 // Display math: $$...$$ as a block or inline paragraph
@@ -131,6 +144,16 @@ export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, b
 
   const handleDiagramClick = (e: MouseEvent) => {
     const target = e.target as HTMLElement
+
+    // File path links — open in editor
+    const link = target.closest('.file-link') as HTMLElement | null
+    if (link) {
+      e.preventDefault()
+      e.stopPropagation()
+      const fp = link.getAttribute('data-fpath')
+      if (fp) fetch('/open?path=' + encodeURIComponent(fp))
+      return
+    }
 
     // Toggle button: switch between rendered and source
     const btn = target.closest('.diagram-toggle') as HTMLElement | null
@@ -224,7 +247,7 @@ export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, b
               ) : (
                 <div
                   class="md"
-                  dangerouslySetInnerHTML={{ __html: (marked.parse(msg.content) as string).replace(/^<p>/, '<p><span class="msg-prefix">a: </span>') }}
+                  dangerouslySetInnerHTML={{ __html: linkifyPaths((marked.parse(msg.content) as string).replace(/^<p>/, '<p><span class="msg-prefix">a: </span>'), session.cwd) }}
                 />
               )}
             </div>
