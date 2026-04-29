@@ -1,7 +1,6 @@
 import { useState } from 'preact/hooks'
 import type { IdxEntry } from '../lib/api'
 import type { Theme } from '../lib/theme'
-import { truncate } from '../lib/chat'
 
 interface Props {
   sessions: IdxEntry[]
@@ -18,12 +17,44 @@ interface Props {
 function stateClass(state: string) {
   if (state === 'idle') return 'idle'
   if (state === 'stopped') return 'stopped'
-  return 'running' // thinking, calling: <tool>, etc.
+  return 'running'
+}
+
+interface SessionNode {
+  session: IdxEntry | null
+  children: Map<string, SessionNode>
+}
+
+function buildTree(sessions: IdxEntry[]): SessionNode {
+  const root: SessionNode = { session: null, children: new Map() }
+  for (const s of sessions) {
+    const parts = s.id.split('__')
+    let node = root
+    for (let i = 0; i < parts.length - 1; i++) {
+      const key = parts.slice(0, i + 1).join('__')
+      if (!node.children.has(key)) {
+        node.children.set(key, { session: null, children: new Map() })
+      }
+      node = node.children.get(key)!
+    }
+    if (node.children.has(s.id)) {
+      node.children.get(s.id)!.session = s
+    } else {
+      node.children.set(s.id, { session: s, children: new Map() })
+    }
+  }
+  return root
+}
+
+function leafName(id: string): string {
+  const parts = id.split('__')
+  return parts[parts.length - 1]
 }
 
 export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill, onRename, themes, currentTheme, onThemeChange }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
 
   const startRename = (e: MouseEvent, id: string) => {
     e.stopPropagation()
@@ -36,6 +67,70 @@ export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill, onRenam
     setEditingId(null)
     if (name && name !== oldId) onRename(oldId, name)
   }
+
+  const toggle = (id: string, e: MouseEvent) => {
+    e.stopPropagation()
+    setCollapsed(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const tree = buildTree(sessions)
+
+  function renderNode(node: SessionNode, depth: number): any {
+    const items: any[] = []
+    for (const [id, child] of node.children) {
+      const s = child.session
+      const hasChildren = child.children.size > 0
+      const isCollapsed = collapsed.has(id)
+
+      if (s) {
+        items.push(
+          <div key={id} class="stree-node" style={{ marginLeft: (depth * 14) + 'px' }}>
+            <div
+              class={`stree-row${s.id === selectedId ? ' selected' : ''}`}
+              onClick={() => onSelect(s.id === selectedId ? null : s.id)}
+            >
+              {hasChildren && (
+                <span class={`stree-chevron${isCollapsed ? ' collapsed' : ''}`} onClick={(e: MouseEvent) => toggle(id, e)}>&#9662;</span>
+              )}
+              <span class={`state-dot ${stateClass(s.state)}`} />
+              {editingId === s.id ? (
+                <input
+                  class="session-rename-input"
+                  value={editValue}
+                  onInput={e => setEditValue((e.target as HTMLInputElement).value)}
+                  onBlur={() => commitRename(s.id)}
+                  onKeyDown={e => { if (e.key === 'Enter') commitRename(s.id); if (e.key === 'Escape') setEditingId(null) }}
+                  onClick={e => e.stopPropagation()}
+                  autoFocus
+                />
+              ) : (
+                <span class="stree-label" onDblClick={(e: MouseEvent) => startRename(e, s.id)}>{leafName(s.id)}</span>
+              )}
+              <span class="stree-state">{s.state}</span>
+              <button
+                class="btn-kill"
+                title="Kill session"
+                onClick={(e: MouseEvent) => { e.stopPropagation(); onKill(s.id) }}
+              >&#10005;</button>
+            </div>
+            {hasChildren && !isCollapsed && renderNode(child, depth + 1)}
+          </div>
+        )
+      } else if (hasChildren) {
+        items.push(
+          <div key={id}>
+            {renderNode(child, depth + 1)}
+          </div>
+        )
+      }
+    }
+    return items
+  }
+
   return (
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -57,41 +152,7 @@ export function Sidebar({ sessions, selectedId, onSelect, onNew, onKill, onRenam
         {sessions.length === 0 && (
           <div class="session-empty">no sessions</div>
         )}
-        {sessions.map(s => (
-          <div
-            key={s.id}
-            class={`session-card${s.id === selectedId ? ' selected' : ''}`}
-            onClick={() => onSelect(s.id === selectedId ? null : s.id)}
-          >
-            <div class="session-card-row">
-              <div class={`state-dot ${stateClass(s.state)}`} />
-              {editingId === s.id ? (
-                <input
-                  class="session-rename-input"
-                  value={editValue}
-                  onInput={e => setEditValue((e.target as HTMLInputElement).value)}
-                  onBlur={() => commitRename(s.id)}
-                  onKeyDown={e => { if (e.key === 'Enter') commitRename(s.id); if (e.key === 'Escape') setEditingId(null) }}
-                  onClick={e => e.stopPropagation()}
-                  autoFocus
-                />
-              ) : (
-                <div class="session-id-label" onDblClick={(e: MouseEvent) => startRename(e, s.id)}>{s.id}</div>
-              )}
-              <div class="session-state-label">{s.state}</div>
-              <button
-                class="btn-kill"
-                title="Kill session"
-                onClick={(e: MouseEvent) => { e.stopPropagation(); onKill(s.id) }}
-              >✕</button>
-            </div>
-            <div class="session-cwd" title={s.cwd}>{s.cwd}</div>
-            <div class="session-badges">
-              <span class="badge accent">{s.backend}</span>
-              <span class="badge">{truncate(s.model, 22)}</span>
-            </div>
-          </div>
-        ))}
+        {renderNode(tree, 0)}
       </div>
 
       {themes.length > 1 && (

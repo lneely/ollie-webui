@@ -222,6 +222,7 @@ export function ChatPane({ session, cfg, messages, onSend, onStop, browsePath, b
           <div class={`state-dot ${stateClass(state)}`} style="margin-right: 2px;" />
           <span class="badge accent">{cfg.backend ?? session.backend}</span>
           <span class="badge">{truncate(cfg.model ?? session.model, 24)}</span>
+          <span class="badge dim" title={session.cwd}>{session.cwd}</span>
           {cfg.agent && cfg.agent !== 'default' && (
             <span class="badge warn">{cfg.agent}</span>
           )}

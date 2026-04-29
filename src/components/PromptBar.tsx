@@ -10,7 +10,6 @@ export function PromptBar({ running, onSend, onStop }: Props) {
   const [value, setValue] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => { ref.current?.focus() })
 
   const submit = () => {
     const text = value.trim()

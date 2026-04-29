@@ -156,32 +156,54 @@ input, select, textarea { font-family: inherit; }
 }
 .theme-select:focus { border-color: var(--accent-focus); }
 
-/* ---- Session Card ---- */
-.session-card {
-  padding: 10px 10px 10px 12px;
-  border-radius: var(--r-lg);
-  cursor: pointer;
-  margin-bottom: 2px;
-  border: 1px solid transparent;
-  transition: background 0.12s, border-color 0.12s;
-  position: relative;
-}
-
-.session-card:hover {
-  background: var(--hover);
-  border-color: var(--border);
-}
-
-.session-card.selected {
-  background: var(--accent-soft);
-  border-color: var(--accent-border);
-}
-
-.session-card-row {
+/* ---- Session Tree ---- */
+.stree-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 5px;
+  gap: 6px;
+  padding: 4px 8px 4px 0;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: nowrap;
+  position: relative;
+}
+.stree-row:hover {
+  background: var(--hover);
+}
+.stree-row.selected {
+  background: var(--accent-soft);
+}
+.stree-chevron {
+  font-size: 18px;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: transform 0.12s;
+  user-select: none;
+  width: 10px;
+  text-align: center;
+  line-height: 7px;
+  margin-top: -3px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 7px;
+  margin-top: -3px;
+}
+.stree-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+.stree-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.stree-state {
+  font-size: 10px;
+  color: var(--text-faint);
+  flex-shrink: 0;
 }
 
 .state-dot {
@@ -203,43 +225,6 @@ input, select, textarea { font-family: inherit; }
   50%       { opacity: 0.6; box-shadow: 0 0 3px var(--running-glow); }
 }
 
-.session-id-label {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text);
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.session-state-label {
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--text-faint);
-  flex-shrink: 0;
-}
-
-.session-cwd {
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  padding-left: 15px;
-  margin-bottom: 6px;
-}
-
-.session-badges {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding-left: 15px;
-  flex-wrap: wrap;
-}
-
 .btn-kill {
   display: none;
   background: none;
@@ -252,7 +237,7 @@ input, select, textarea { font-family: inherit; }
   border-radius: var(--r-sm);
 }
 .btn-kill:hover { color: var(--danger); }
-.session-card:hover .btn-kill { display: block; }
+.stree-row:hover .btn-kill { display: block; }
 
 /* ---- Badges ---- */
 .badge {
@@ -275,6 +260,11 @@ input, select, textarea { font-family: inherit; }
   color: var(--warning);
   border-color: rgba(251, 191, 36, 0.22);
   background: rgba(251, 191, 36, 0.05);
+}
+.badge.dim {
+  color: var(--text-faint);
+  border-color: transparent;
+  background: none;
 }
 
 /* ---- Buttons ---- */
