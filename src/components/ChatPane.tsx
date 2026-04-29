@@ -347,19 +347,22 @@ function DiagramModal({ html, onClose }: { html: string; onClose: () => void }) 
 }
 
 function formatToolContent(raw: string): { name: string; detail: string; body: string; output: string } {
-  const m = raw.match(/^(\w+)\((\{[\s\S]*\})\)(.*)$/s)
+  // Call is always on the first line; output follows after the newline.
+  const nl = raw.indexOf('\n')
+  const callLine = nl === -1 ? raw : raw.slice(0, nl)
+  const output = nl === -1 ? '' : raw.slice(nl + 1).trimEnd()
+  const m = callLine.match(/^(\w+)\((.*)\)$/)
   if (!m) return { name: '', detail: '', body: raw, output: '' }
   const name = m[1]
-  const output = m[3].trim()
+  const argsRaw = m[2]
   try {
-    const obj = JSON.parse(m[2])
-    // Extract a useful detail: tool name or language
+    const obj = JSON.parse(argsRaw)
     let detail = ''
     if (obj.steps?.[0]?.tool) detail = obj.steps[0].tool
     else if (obj.steps?.[0]?.code) detail = obj.language ?? 'bash'
     return { name, detail, body: JSON.stringify(obj, null, 2), output }
   } catch {
-    return { name, detail: '', body: m[2], output }
+    return { name, detail: '', body: argsRaw, output }
   }
 }
 
