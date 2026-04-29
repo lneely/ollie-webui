@@ -366,6 +366,28 @@ function formatToolContent(raw: string): { name: string; detail: string; body: s
   }
 }
 
+const TOOL_ICONS: Record<string, string> = {
+  reasoning_think: '💭',
+  file_edit: '📝',
+  file_write: '📝',
+  file_read: '📄',
+  file_glob: '📂',
+  file_grep: '🔍',
+  memory_recall: '🧠',
+  memory_remember: '🧠',
+  browser_screencap: '📸',
+  denote_view: '📓',
+  subagent_spawn: '🧵',
+  task_add: '☑️',
+  task_check: '☑️',
+  task_clear: '☑️',
+  bash: '🖥️',
+}
+
+function toolIcon(detail: string): string {
+  return TOOL_ICONS[detail] ?? '🖥️'
+}
+
 function ToolCall({ content }: { content: string }) {
   const { name, detail, body, output } = formatToolContent(content)
   const [open, setOpen] = useState(false)
@@ -373,7 +395,7 @@ function ToolCall({ content }: { content: string }) {
     <div class="tool-call">
       <details open={open} onToggle={(e: Event) => setOpen((e.target as HTMLDetailsElement).open)}>
         <summary class="tool-header">
-          <span class="tool-arrow">🖥️</span>
+          <span class="tool-arrow">{toolIcon(detail)}</span>
           {name && <span class="tool-name">{name}</span>}
           {detail && <span class="tool-detail">{detail}</span>}
         </summary>
